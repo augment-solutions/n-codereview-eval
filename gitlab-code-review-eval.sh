@@ -8,6 +8,7 @@
 #
 # Prerequisites:
 #   - auggie CLI installed and authenticated (`auggie login`)
+#   - glab CLI installed (https://gitlab.com/gitlab-org/cli)
 #   - GITLAB_TOKEN env var set (personal or project access token with api scope)
 #   - curl, jq
 #
@@ -53,7 +54,7 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   echo "Error: missing required parameters: ${missing[*]}" >&2
   exit 1
 fi
-for cmd in curl jq auggie; do
+for cmd in curl jq auggie glab; do
   command -v "$cmd" >/dev/null || { echo "Error: '$cmd' is required but not found" >&2; exit 1; }
 done
 
@@ -129,9 +130,20 @@ for iid in $(echo "$AUGMENT_MR_IIDS" | jq -r '.[]'); do
     "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}" | jq -r '.path_with_namespace')/-/merge_requests/${iid}"
   echo "[$INDEX/$AUGMENT_MR_COUNT] Evaluating MR !${iid}  ${MR_URL}"
 
-  PROMPT="Evaluate this merge request ${MR_URL} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${GITLAB_SERVICE_ACCOUNT}'. Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
+  PROMPT="Evaluate this merge request ${MR_URL} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${GITLAB_SERVICE_ACCOUNT}'.
 
-  EVAL_OUTPUT=$(auggie --persona augment-code-review-eval --print "$PROMPT" 2>/dev/null || true)
+IMPORTANT: To fetch MR data, use ONLY the glab CLI (GitLab CLI) via the terminal (launch-process tool). The GITLAB_TOKEN environment variable is already set and glab will authenticate automatically. Do NOT use any MCP server or other tool to access GitLab.
+
+Use these glab commands:
+- glab mr view ${iid} --repo ${GITLAB_URL#https://}/\$(glab api projects/${PROJECT_ID} | jq -r .path_with_namespace)
+- glab mr diff ${iid} --repo ...
+- glab mr notes list ${iid} --repo ...
+- glab api projects/${PROJECT_ID}/merge_requests/${iid}/notes
+- glab api projects/${PROJECT_ID}/merge_requests/${iid}/changes
+
+Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
+
+  EVAL_OUTPUT=$(GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" 2>/dev/null || true)
 
   # Try to extract JSON from the response (the persona returns a JSON block)
   MR_JSON=$(echo "$EVAL_OUTPUT" | sed -n '/^{/,/^}/p' | head -1 || true)

@@ -7,9 +7,9 @@ This script finds merged MRs that Augment reviewed, runs the `augment-code-revie
 ## Prerequisites
 
 - **auggie CLI** installed and authenticated (`npm install -g @augmentcode/auggie && auggie login`)
-- **GITLAB_TOKEN** env var — a GitLab personal or project access token with `api` scope
+- **glab CLI** installed ([gitlab.com/gitlab-org/cli](https://gitlab.com/gitlab-org/cli)) — the eval persona uses `glab` to fetch MR data
+- **GITLAB_TOKEN** env var — a GitLab personal or project access token with `api` scope (used by both the script and `glab`)
 - **curl**, **jq**, **bc** available on PATH
-- A GitLab MCP server configured for the auggie CLI so the eval persona can read MR diffs and comments (see [Augment docs](https://docs.augmentcode.com))
 
 ## Usage
 
