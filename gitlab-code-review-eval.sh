@@ -15,7 +15,7 @@
 #   ./gitlab-code-review-eval.sh \
 #       --gitlab-url https://gitlab.example.com \
 #       --project-id 123                        \
-#       --augment-username augment-bot           \
+#       --gitlab-service-account-name augment-bot           \
 #       [--days 7]                               \
 #       [--output report.json]
 #
@@ -26,14 +26,14 @@ DAYS=7
 OUTPUT_FILE="augment-code-review-eval-report.json"
 GITLAB_URL=""
 PROJECT_ID=""
-AUGMENT_USERNAME=""
+GITLAB_SERVICE_ACCOUNT=""
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --gitlab-url)       GITLAB_URL="$2";        shift 2 ;;
     --project-id)       PROJECT_ID="$2";        shift 2 ;;
-    --augment-username) AUGMENT_USERNAME="$2";  shift 2 ;;
+    --gitlab-service-account-name) GITLAB_SERVICE_ACCOUNT="$2";  shift 2 ;;
     --days)             DAYS="$2";              shift 2 ;;
     --output)           OUTPUT_FILE="$2";       shift 2 ;;
     -h|--help)
@@ -47,7 +47,7 @@ done
 missing=()
 [[ -z "$GITLAB_URL" ]]        && missing+=("--gitlab-url")
 [[ -z "$PROJECT_ID" ]]        && missing+=("--project-id")
-[[ -z "$AUGMENT_USERNAME" ]]  && missing+=("--augment-username")
+[[ -z "$GITLAB_SERVICE_ACCOUNT" ]]  && missing+=("--gitlab-service-account-name")
 [[ -z "${GITLAB_TOKEN:-}" ]]  && missing+=("GITLAB_TOKEN env var")
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "Error: missing required parameters: ${missing[*]}" >&2
@@ -67,7 +67,7 @@ fi
 echo "=== Augment Code Review Eval ==="
 echo "GitLab:           $GITLAB_URL"
 echo "Project ID:       $PROJECT_ID"
-echo "Augment user:     $AUGMENT_USERNAME"
+echo "Service account:     $GITLAB_SERVICE_ACCOUNT"
 echo "Window:           last $DAYS days (after $AFTER_DATE)"
 echo "Output:           $OUTPUT_FILE"
 echo ""
@@ -98,11 +98,11 @@ TOTAL_MR_COUNT=$(echo "$ALL_MRS" | jq 'length')
 echo "  Found $TOTAL_MR_COUNT merged MR(s) in window."
 
 # ── 2. Filter to MRs that Augment commented on ───────────────────────────────
-echo "Filtering to MRs reviewed by '$AUGMENT_USERNAME' …"
+echo "Filtering to MRs reviewed by '$GITLAB_SERVICE_ACCOUNT' …"
 AUGMENT_MR_IIDS="[]"
 for iid in $(echo "$ALL_MRS" | jq -r '.[].iid'); do
   notes=$(gitlab_get_all "projects/${PROJECT_ID}/merge_requests/${iid}/notes")
-  has_augment=$(echo "$notes" | jq --arg u "$AUGMENT_USERNAME" '[.[] | select(.author.username == $u)] | length')
+  has_augment=$(echo "$notes" | jq --arg u "$GITLAB_SERVICE_ACCOUNT" '[.[] | select(.author.username == $u)] | length')
   if [[ "$has_augment" -gt 0 ]]; then
     AUGMENT_MR_IIDS=$(echo "$AUGMENT_MR_IIDS" | jq --argjson iid "$iid" '. + [$iid]')
   fi
@@ -129,7 +129,7 @@ for iid in $(echo "$AUGMENT_MR_IIDS" | jq -r '.[]'); do
     "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}" | jq -r '.path_with_namespace')/-/merge_requests/${iid}"
   echo "[$INDEX/$AUGMENT_MR_COUNT] Evaluating MR !${iid}  ${MR_URL}"
 
-  PROMPT="Evaluate this merge request ${MR_URL} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${AUGMENT_USERNAME}'. Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
+  PROMPT="Evaluate this merge request ${MR_URL} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${GITLAB_SERVICE_ACCOUNT}'. Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
 
   EVAL_OUTPUT=$(auggie --persona augment-code-review-eval --print "$PROMPT" 2>/dev/null || true)
 

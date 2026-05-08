@@ -19,7 +19,7 @@ export GITLAB_TOKEN="glpat-xxxxxxxxxxxx"
 ./gitlab-code-review-eval.sh \
     --gitlab-url https://gitlab.example.com \
     --project-id 123 \
-    --augment-username augment-bot \
+    --gitlab-service-account-name augment-bot \
     --days 14 \
     --output my-report.json
 ```
@@ -30,7 +30,7 @@ export GITLAB_TOKEN="glpat-xxxxxxxxxxxx"
 |------|----------|---------|-------------|
 | `--gitlab-url` | ✅ | — | Base URL of your GitLab instance |
 | `--project-id` | ✅ | — | Numeric GitLab project ID |
-| `--augment-username` | ✅ | — | Username of the Augment service account on GitLab |
+| `--gitlab-service-account-name` | ✅ | — | Username of the Augment service account on GitLab |
 | `--days` | | `7` | Number of days to look back for merged MRs |
 | `--output` | | `augment-code-review-eval-report.json` | Output file path |
 
