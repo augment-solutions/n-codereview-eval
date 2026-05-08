@@ -237,9 +237,25 @@ Use these glab commands:
 
 Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
 
-  EVAL_OUTPUT=$(timeout "${MR_TIMEOUT}" env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" 2>/dev/null || true)
+  EVAL_STDERR=$(mktemp)
+  EVAL_OUTPUT=$(timeout "${MR_TIMEOUT}" env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" 2>"$EVAL_STDERR" || true)
 
   ELAPSED=$(( $(date +%s) - START_TIME ))
+
+  # If auggie produced no stdout, show stderr to help debug
+  if [[ -z "$EVAL_OUTPUT" ]]; then
+    echo "  ⚠ MR !${iid} — auggie returned no output (${ELAPSED}s)"
+    if [[ -s "$EVAL_STDERR" ]]; then
+      echo "  stderr:"
+      sed 's/^/    /' "$EVAL_STDERR"
+    fi
+    SKIPPED=$(jq -n --arg iid "$iid" --arg url "$MR_URL" '{mr_number:($iid|tonumber), url:$url, error:"auggie returned no output"}')
+    EVAL_RESULTS=$(echo "$EVAL_RESULTS" | jq --argjson s "$SKIPPED" '. + [$s]')
+    rm -f "$EVAL_STDERR"
+    echo ""
+    continue
+  fi
+  rm -f "$EVAL_STDERR"
 
   MR_JSON=""
   if MR_JSON=$(extract_json "$EVAL_OUTPUT"); then
@@ -250,6 +266,8 @@ Return the result as a JSON object with the structure: {repo, mr_number, total_c
     SKIPPED=$(jq -n --arg iid "$iid" --arg url "$MR_URL" '{mr_number:($iid|tonumber), url:$url, error:"failed to parse eval output"}')
     EVAL_RESULTS=$(echo "$EVAL_RESULTS" | jq --argjson s "$SKIPPED" '. + [$s]')
     echo "  ⚠ MR !${iid} — Could not parse eval output (${ELAPSED}s)"
+    echo "  Raw output (first 500 chars):"
+    echo "    $(echo "$EVAL_OUTPUT" | head -c 500)"
   fi
   echo ""
 done
