@@ -238,7 +238,22 @@ Use these glab commands:
 Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
 
   EVAL_STDERR=$(mktemp)
-  EVAL_OUTPUT=$(timeout "${MR_TIMEOUT}" env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" 2>"$EVAL_STDERR" || true)
+  EVAL_STDOUT=$(mktemp)
+  # Run auggie with a timeout — use 'timeout' (Linux/GNU) or fall back to a
+  # background-process approach on macOS where 'timeout' is not available.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${MR_TIMEOUT}" env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" >"$EVAL_STDOUT" 2>"$EVAL_STDERR" || true
+  else
+    env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" >"$EVAL_STDOUT" 2>"$EVAL_STDERR" &
+    AUGGIE_PID=$!
+    ( sleep "${MR_TIMEOUT}" && kill "$AUGGIE_PID" 2>/dev/null ) &
+    TIMER_PID=$!
+    wait "$AUGGIE_PID" 2>/dev/null || true
+    kill "$TIMER_PID" 2>/dev/null || true
+    wait "$TIMER_PID" 2>/dev/null || true
+  fi
+  EVAL_OUTPUT=$(cat "$EVAL_STDOUT")
+  rm -f "$EVAL_STDOUT"
 
   ELAPSED=$(( $(date +%s) - START_TIME ))
 
