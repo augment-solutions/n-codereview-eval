@@ -32,6 +32,7 @@ PROJECT_ID=""
 REPO=""
 GITLAB_SERVICE_ACCOUNT=""
 INCLUDE_OPEN=false
+MAX_MRS=""
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --project-id)       PROJECT_ID="$2";        shift 2 ;;
     --gitlab-service-account-name) GITLAB_SERVICE_ACCOUNT="$2";  shift 2 ;;
     --include-open)     INCLUDE_OPEN=true;      shift ;;
+    --max-mrs-to-review) MAX_MRS="$2";         shift 2 ;;
     --days)             DAYS="$2";              shift 2 ;;
     --output)           OUTPUT_FILE="$2";       shift 2 ;;
     -h|--help)
@@ -159,6 +161,13 @@ done
 
 AUGMENT_MR_COUNT=$(echo "$AUGMENT_MR_IIDS" | jq 'length')
 echo "  $AUGMENT_MR_COUNT MR(s) were reviewed by Augment."
+
+# ── Apply --max-mrs-to-review limit ──────────────────────────────────────────
+if [[ -n "$MAX_MRS" && "$AUGMENT_MR_COUNT" -gt "$MAX_MRS" ]]; then
+  echo "  Limiting to $MAX_MRS MR(s) (--max-mrs-to-review)."
+  AUGMENT_MR_IIDS=$(echo "$AUGMENT_MR_IIDS" | jq --argjson n "$MAX_MRS" '.[:$n]')
+  AUGMENT_MR_COUNT="$MAX_MRS"
+fi
 echo ""
 
 if [[ "$AUGMENT_MR_COUNT" -eq 0 ]]; then

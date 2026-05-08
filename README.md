@@ -46,6 +46,7 @@ GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gi
 | `--gitlab-url` | | `https://gitlab.com` | Base URL of your GitLab instance (auto-detected from `--repo` URL) |
 | `--project-id` | | *(auto-resolved)* | Numeric project ID (auto-resolved from `--repo` if not provided) |
 | `--include-open` | | *(off)* | Also include open (not yet merged) MRs in the evaluation |
+| `--max-mrs-to-review` | | *(all)* | Maximum number of MRs to evaluate |
 | `--days` | | `7` | Number of days to look back for MRs |
 | `--output` | | `augment-code-review-eval-report.json` | Output file path |
 
