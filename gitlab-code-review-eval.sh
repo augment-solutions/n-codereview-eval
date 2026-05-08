@@ -14,11 +14,13 @@
 #
 # Usage:
 #   ./gitlab-code-review-eval.sh \
-#       --gitlab-url https://gitlab.example.com \
-#       --project-id 123                        \
-#       --gitlab-service-account-name augment-bot           \
-#       [--days 7]                               \
+#       --repo https://gitlab.example.com/group/project   \
+#       --gitlab-service-account-name augment-bot          \
+#       [--days 7]                                         \
 #       [--output report.json]
+#
+#   --repo accepts a full GitLab URL (https://gitlab.com/group/project)
+#         or a namespace path (group/project) when combined with --gitlab-url.
 #
 set -euo pipefail
 
@@ -27,11 +29,13 @@ DAYS=7
 OUTPUT_FILE="augment-code-review-eval-report.json"
 GITLAB_URL=""
 PROJECT_ID=""
+REPO=""
 GITLAB_SERVICE_ACCOUNT=""
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --repo)             REPO="$2";              shift 2 ;;
     --gitlab-url)       GITLAB_URL="$2";        shift 2 ;;
     --project-id)       PROJECT_ID="$2";        shift 2 ;;
     --gitlab-service-account-name) GITLAB_SERVICE_ACCOUNT="$2";  shift 2 ;;
@@ -44,12 +48,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ── Resolve repo → GITLAB_URL + PROJECT_ID ────────────────────────────────────
+if [[ -n "$REPO" ]]; then
+  # Full URL: https://gitlab.example.com/group/subgroup/project
+  if [[ "$REPO" =~ ^https?:// ]]; then
+    # Strip protocol + host to get the path
+    GITLAB_URL=$(echo "$REPO" | sed -E 's|(https?://[^/]+).*|\1|')
+    PROJECT_PATH=$(echo "$REPO" | sed -E 's|https?://[^/]+/||; s|/$||')
+  else
+    # Bare namespace path: group/project — requires --gitlab-url
+    PROJECT_PATH="$REPO"
+    if [[ -z "$GITLAB_URL" ]]; then
+      GITLAB_URL="https://gitlab.com"
+      echo "No --gitlab-url provided, defaulting to $GITLAB_URL"
+    fi
+  fi
+fi
+
 # ── Validate required inputs ─────────────────────────────────────────────────
 missing=()
-[[ -z "$GITLAB_URL" ]]        && missing+=("--gitlab-url")
-[[ -z "$PROJECT_ID" ]]        && missing+=("--project-id")
-[[ -z "$GITLAB_SERVICE_ACCOUNT" ]]  && missing+=("--gitlab-service-account-name")
-[[ -z "${GITLAB_TOKEN:-}" ]]  && missing+=("GITLAB_TOKEN env var")
+[[ -z "$GITLAB_URL" && -z "$REPO" ]]  && missing+=("--repo")
+[[ -z "$GITLAB_SERVICE_ACCOUNT" ]]    && missing+=("--gitlab-service-account-name")
+[[ -z "${GITLAB_TOKEN:-}" ]]          && missing+=("GITLAB_TOKEN env var")
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "Error: missing required parameters: ${missing[*]}" >&2
   exit 1
@@ -57,6 +77,24 @@ fi
 for cmd in curl jq auggie glab; do
   command -v "$cmd" >/dev/null || { echo "Error: '$cmd' is required but not found" >&2; exit 1; }
 done
+
+# ── Resolve PROJECT_ID from path if not provided ─────────────────────────────
+if [[ -z "$PROJECT_ID" ]]; then
+  if [[ -z "${PROJECT_PATH:-}" ]]; then
+    echo "Error: either --repo or --project-id is required" >&2
+    exit 1
+  fi
+  ENCODED_PATH=$(echo "$PROJECT_PATH" | sed 's|/|%2F|g')
+  echo "Resolving project ID for '$PROJECT_PATH' …"
+  PROJECT_INFO=$(curl -sf --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+    "${GITLAB_URL}/api/v4/projects/${ENCODED_PATH}")
+  PROJECT_ID=$(echo "$PROJECT_INFO" | jq -r '.id')
+  if [[ -z "$PROJECT_ID" || "$PROJECT_ID" == "null" ]]; then
+    echo "Error: could not resolve project ID for '$PROJECT_PATH'. Check the repo path and your GITLAB_TOKEN permissions." >&2
+    exit 1
+  fi
+  echo "  Resolved to project ID: $PROJECT_ID"
+fi
 
 # ── Compute date window ──────────────────────────────────────────────────────
 if date --version >/dev/null 2>&1; then
@@ -67,8 +105,9 @@ fi
 
 echo "=== Augment Code Review Eval ==="
 echo "GitLab:           $GITLAB_URL"
+echo "Project:          ${PROJECT_PATH:-$PROJECT_ID}"
 echo "Project ID:       $PROJECT_ID"
-echo "Service account:     $GITLAB_SERVICE_ACCOUNT"
+echo "Service account:  $GITLAB_SERVICE_ACCOUNT"
 echo "Window:           last $DAYS days (after $AFTER_DATE)"
 echo "Output:           $OUTPUT_FILE"
 echo ""

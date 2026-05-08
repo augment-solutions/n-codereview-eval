@@ -14,22 +14,23 @@ This script finds merged MRs that Augment reviewed, runs the `augment-code-revie
 ## Quick Start
 
 ```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --gitlab-url https://gitlab.example.com --project-id 123 --gitlab-service-account-name augment-bot
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name augment-bot
 ```
 
 ### With optional flags
 
 ```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --gitlab-url https://gitlab.example.com --project-id 123 --gitlab-service-account-name augment-bot --days 14 --output my-report.json
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name augment-bot --days 14 --output my-report.json
 ```
 
 ### Options
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
-| `--gitlab-url` | ✅ | — | Base URL of your GitLab instance |
-| `--project-id` | ✅ | — | Numeric GitLab project ID |
+| `--repo` | ✅ | — | GitLab repo — full URL (`https://gitlab.com/group/project`) or namespace path (`group/project`) |
 | `--gitlab-service-account-name` | ✅ | — | Username of the Augment service account on GitLab |
+| `--gitlab-url` | | `https://gitlab.com` | Base URL of your GitLab instance (auto-detected from `--repo` URL) |
+| `--project-id` | | *(auto-resolved)* | Numeric project ID (auto-resolved from `--repo` if not provided) |
 | `--days` | | `7` | Number of days to look back for merged MRs |
 | `--output` | | `augment-code-review-eval-report.json` | Output file path |
 
