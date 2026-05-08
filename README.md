@@ -11,17 +11,16 @@ This script finds merged MRs that Augment reviewed, runs the `augment-code-revie
 - **GITLAB_TOKEN** env var — a GitLab personal or project access token with `api` scope (used by both the script and `glab`)
 - **curl**, **jq**, **bc** available on PATH
 
-## Usage
+## Quick Start
 
 ```bash
-export GITLAB_TOKEN="glpat-xxxxxxxxxxxx"
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --gitlab-url https://gitlab.example.com --project-id 123 --gitlab-service-account-name augment-bot
+```
 
-./gitlab-code-review-eval.sh \
-    --gitlab-url https://gitlab.example.com \
-    --project-id 123 \
-    --gitlab-service-account-name augment-bot \
-    --days 14 \
-    --output my-report.json
+### With optional flags
+
+```bash
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --gitlab-url https://gitlab.example.com --project-id 123 --gitlab-service-account-name augment-bot --days 14 --output my-report.json
 ```
 
 ### Options
