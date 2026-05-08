@@ -225,17 +225,30 @@ for iid in $(echo "$AUGMENT_MR_IIDS" | jq -r '.[]'); do
   echo "[$INDEX/$AUGMENT_MR_COUNT] Evaluating MR !${iid}  ${MR_URL} …"
   START_TIME=$(date +%s)
 
-  PROMPT="Evaluate this merge request ${MR_URL} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${GITLAB_SERVICE_ACCOUNT}'.
+  PROMPT="## CRITICAL INSTRUCTIONS — READ BEFORE DOING ANYTHING
 
-IMPORTANT: To fetch MR data, use ONLY the glab CLI (GitLab CLI) via the terminal (launch-process tool). The GITLAB_TOKEN environment variable is already set and glab will authenticate automatically. Do NOT use any MCP server or other tool to access GitLab.
+This is a GitLab merge request. You MUST use the glab CLI to fetch all data.
 
-Use these glab commands:
-- glab api projects/${PROJECT_ID}/merge_requests/${iid}/notes
-- glab api projects/${PROJECT_ID}/merge_requests/${iid}/changes
-- glab mr view ${iid} --repo ${PROJECT_PATH_CACHED}
-- glab mr diff ${iid} --repo ${PROJECT_PATH_CACHED}
+### MANDATORY tool usage
+- You MUST use the launch-process tool to run glab commands. The GITLAB_TOKEN env var is already set.
+- Do NOT use web-fetch. Do NOT use github-api. Do NOT use any MCP server. Do NOT try to open URLs in a browser. Do NOT use curl.
+- The ONLY way to get MR data is via glab CLI commands through launch-process.
 
-Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
+### glab commands to run (in this order)
+1. Get MR notes/comments: glab api projects/${PROJECT_ID}/merge_requests/${iid}/notes?per_page=100
+2. Get MR changes/diff: glab api projects/${PROJECT_ID}/merge_requests/${iid}/changes
+3. Get MR metadata: glab api projects/${PROJECT_ID}/merge_requests/${iid}
+
+### What to evaluate
+- MR URL: ${MR_URL}
+- The Augment service account username on GitLab is: ${GITLAB_SERVICE_ACCOUNT}
+- Identify all comments authored by that username
+- For each such comment, determine if it was addressed by subsequent commits or replies
+- Evaluate the % of comments from Augment that were addressed
+
+### Required output format
+Return ONLY a JSON object (no markdown fences, no explanation) with this structure:
+{\"repo\": \"${PROJECT_PATH_CACHED}\", \"mr_number\": ${iid}, \"total_comments\": N, \"augment_total_comments\": N, \"augment_addressed_count\": N, \"augment_addressed_percent\": N.N, \"automated_eval_comments\": [{\"addressed\": true/false, \"actionable\": true/false, \"comment_id\": \"ID\", \"primary_category\": \"...\", \"subcategory\": \"...\", \"resolved\": true/false/null, \"is_outdated\": true/false, \"emoji\": \"...\", \"severity\": \"...\", \"author_type\": \"Augment\", \"reply_count\": N}]}"
 
   EVAL_STDERR=$(mktemp)
   EVAL_STDOUT=$(mktemp)
