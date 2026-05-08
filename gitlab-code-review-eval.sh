@@ -318,54 +318,25 @@ fi
 # ── Build breakdowns by severity, primary_category, subcategory, emoji ──────
 # Helper jq function: group an array of comments by a field and produce
 # [{value, count, percent, addressed_count, addressed_percent}]
-BREAKDOWN_JQ='
-def breakdown(field):
-  group_by(.[field])
-  | map({
-      value:             (.[0][field] // "unknown"),
-      count:             length,
-      percent:           ((length * 1000 / ($total | tonumber) + 5) / 10),
-      addressed_count:   ([.[] | select(.addressed == true)] | length),
-      addressed_percent: (if length > 0
-                          then (([.[] | select(.addressed == true)] | length) * 1000 / length + 5) / 10
-                          else 0 end)
-    })
-  | sort_by(-.count);
-'
-
-BREAKDOWNS=$(echo "$ALL_COMMENTS" | jq --arg total "$TOTAL_AUGMENT_COMMENTS" "
-  ${BREAKDOWN_JQ}
+BREAKDOWNS=$(echo "$ALL_COMMENTS" | jq --arg total "$TOTAL_AUGMENT_COMMENTS" '
+  def pct(n; d): if d > 0 then ((n * 10000 / d | floor) / 100) else 0 end;
+  def make_breakdown(key):
+    group_by(.[key])
+    | map({
+        value:             (.[0][key] // "unknown"),
+        count:             length,
+        percent:           pct(length; ($total | tonumber)),
+        addressed_count:   ([.[] | select(.addressed == true)] | length),
+        addressed_percent: pct([.[] | select(.addressed == true)] | length; length)
+      })
+    | sort_by(-.count);
   {
-    by_severity:         ([.[] | . + {_sev: (.severity // \"unknown\")}] | group_by(._sev) | map({
-                            value: .[0]._sev,
-                            count: length,
-                            percent: ((length * 1000 / (\$total | tonumber) + 5) / 10),
-                            addressed_count: ([.[] | select(.addressed == true)] | length),
-                            addressed_percent: (if length > 0 then (([.[] | select(.addressed == true)] | length) * 1000 / length + 5) / 10 else 0 end)
-                          }) | sort_by(-.count)),
-    by_primary_category: ([.[] | . + {_pc: (.primary_category // \"unknown\")}] | group_by(._pc) | map({
-                            value: .[0]._pc,
-                            count: length,
-                            percent: ((length * 1000 / (\$total | tonumber) + 5) / 10),
-                            addressed_count: ([.[] | select(.addressed == true)] | length),
-                            addressed_percent: (if length > 0 then (([.[] | select(.addressed == true)] | length) * 1000 / length + 5) / 10 else 0 end)
-                          }) | sort_by(-.count)),
-    by_subcategory:      ([.[] | . + {_sc: (.subcategory // \"unknown\")}] | group_by(._sc) | map({
-                            value: .[0]._sc,
-                            count: length,
-                            percent: ((length * 1000 / (\$total | tonumber) + 5) / 10),
-                            addressed_count: ([.[] | select(.addressed == true)] | length),
-                            addressed_percent: (if length > 0 then (([.[] | select(.addressed == true)] | length) * 1000 / length + 5) / 10 else 0 end)
-                          }) | sort_by(-.count)),
-    by_emoji:            ([.[] | . + {_em: (.emoji // \"none\")}] | group_by(._em) | map({
-                            value: .[0]._em,
-                            count: length,
-                            percent: ((length * 1000 / (\$total | tonumber) + 5) / 10),
-                            addressed_count: ([.[] | select(.addressed == true)] | length),
-                            addressed_percent: (if length > 0 then (([.[] | select(.addressed == true)] | length) * 1000 / length + 5) / 10 else 0 end)
-                          }) | sort_by(-.count))
+    by_severity:         ([.[] | . + {_sev: (.severity // "unknown")}] | make_breakdown("_sev")),
+    by_primary_category: ([.[] | . + {_pc: (.primary_category // "unknown")}] | make_breakdown("_pc")),
+    by_subcategory:      ([.[] | . + {_sc: (.subcategory // "unknown")}] | make_breakdown("_sc")),
+    by_emoji:            ([.[] | . + {_em: (.emoji // "none")}] | make_breakdown("_em"))
   }
-")
+')
 
 jq -n \
   --arg gl "$GITLAB_URL" \
