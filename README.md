@@ -14,13 +14,27 @@ This script finds merged MRs that Augment reviewed, runs the `augment-code-revie
 ## Quick Start
 
 ```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name augment-bot
+git clone https://github.com/augment-solutions/n-codereview-eval.git && cd n-codereview-eval
 ```
 
-### With optional flags
+Then run the eval:
 
 ```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.com/augment-solutions/n-codereview-eval/main/gitlab-code-review-eval.sh) --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name augment-bot --days 14 --output my-report.json
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name my_service_account
+```
+
+### Examples
+
+Look back 14 days and save to a custom file:
+
+```bash
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name my_service_account --days 14 --output my-report.json
+```
+
+Include open (not yet merged) MRs:
+
+```bash
+GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name my_service_account --include-open
 ```
 
 ### Options
