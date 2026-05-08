@@ -20,21 +20,12 @@ git clone https://github.com/augment-solutions/n-codereview-eval.git && cd n-cod
 Then run the eval:
 
 ```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name my_service_account
-```
-
-### Examples
-
-Look back 14 days and save to a custom file:
-
-```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name my_service_account --days 14 --output my-report.json
-```
-
-Include open (not yet merged) MRs:
-
-```bash
-GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gitlab.com/mygroup/myproject --gitlab-service-account-name my_service_account --include-open
+GITLAB_TOKEN="glpat-XXX" ./gitlab-code-review-eval.sh \
+  --repo https://gitlab.com/augmentcode-sa/ecomm-stack \
+  --gitlab-service-account-name service_account_project_80395882_4cec11437b042730ca8ca95a0fb39a3c \
+  --include-open \
+  --days 10 \
+  --max-mrs-to-review 3
 ```
 
 ### Options
@@ -54,42 +45,119 @@ GITLAB_TOKEN="glpat-xxxxxxxxxxxx" ./gitlab-code-review-eval.sh --repo https://gi
 
 1. **Discover MRs** — Queries the GitLab API for all merged MRs updated within the time window
 2. **Filter** — Keeps only MRs where the Augment service account left comments
-3. **Evaluate** — Runs `auggie --persona augment-code-review-eval --print` against each MR
+3. **Evaluate** — Runs `auggie --persona augment-code-review-eval --print` against each MR (~60–90s per MR)
 4. **Report** — Consolidates per-MR results into a single JSON report with breakdowns
+
+## Example Run
+
+```
+Resolving project ID for 'augmentcode-sa/ecomm-stack' …
+  Resolved to project ID: 80395882
+=== Augment Code Review Eval ===
+GitLab:           https://gitlab.com
+Project:          augmentcode-sa/ecomm-stack
+Project ID:       80395882
+Service account:  service_account_project_80395882_4cec11437b042730ca8ca95a0fb39a3c
+Window:           last 10 days (after 2026-04-28T20:31:00Z)
+Output:           augment-code-review-eval-report.json
+
+Fetching all MRs (merged + open) since 2026-04-28T20:31:00Z …
+  Found 7 MR(s) in window.
+Filtering to MRs reviewed by 'service_account_project_80395882_4cec11437b042730ca8ca95a0fb39a3c' …
+  6 MR(s) were reviewed by Augment.
+  Limiting to 3 MR(s) (--max-mrs-to-review).
+
+Running evaluations (300s timeout each) …
+
+[1/3] Evaluating MR !173  https://gitlab.com/augmentcode-sa/ecomm-stack/-/merge_requests/173 …
+  ✓ MR !173 — Addressed: 100.0% (70s)
+
+[2/3] Evaluating MR !170  https://gitlab.com/augmentcode-sa/ecomm-stack/-/merge_requests/170 …
+  ✓ MR !170 — Addressed: 100.0% (62s)
+
+[3/3] Evaluating MR !172  https://gitlab.com/augmentcode-sa/ecomm-stack/-/merge_requests/172 …
+  ✓ MR !172 — Addressed: 100.0% (69s)
+
+Building consolidated report …
+
+=== Report Summary ===
+  MRs evaluated:            3
+  Total Augment comments:   3
+  Addressed:                3
+  Overall addressed rate:   100.0%
+
+  --- By Severity ---
+    unknown     3       100%    addr: 3/3 (100%)
+
+  --- By Primary Category ---
+    tests-quality       3       100%    addr: 3/3 (100%)
+
+  --- By Subcategory ---
+    tests-quality:coverage-gaps 3       100%    addr: 3/3 (100%)
+
+  --- By Emoji ---
+    none        3       100%    addr: 3/3 (100%)
+
+Full report written to: augment-code-review-eval-report.json
+```
 
 ## Output
 
-The report JSON has the following structure:
+After the run, `cat augment-code-review-eval-report.json` produces:
 
 ```json
 {
-  "gitlab_url": "https://gitlab.example.com",
-  "project": "group/repo",
-  "project_id": 123,
-  "window_days": 7,
-  "window_after": "2025-01-01T00:00:00Z",
-  "generated_at": "2025-01-08T12:00:00Z",
+  "gitlab_url": "https://gitlab.com",
+  "project": "augmentcode-sa/ecomm-stack",
+  "project_id": 80395882,
+  "window_days": 10,
+  "window_after": "2026-04-28T20:31:00Z",
+  "generated_at": "2026-05-08T20:34:26Z",
   "summary": {
-    "total_mrs_evaluated": 5,
-    "total_augment_comments": 23,
-    "total_addressed": 19,
-    "overall_addressed_percent": 82.6
+    "total_mrs_evaluated": 3,
+    "total_augment_comments": 3,
+    "total_addressed": 3,
+    "overall_addressed_percent": 100.0
   },
   "breakdowns": {
     "by_severity": [
-      { "value": "high", "count": 8, "percent": 34.8, "addressed_count": 6, "addressed_percent": 75.0 }
+      { "value": "unknown", "count": 3, "percent": 100, "addressed_count": 3, "addressed_percent": 100 }
     ],
     "by_primary_category": [
-      { "value": "security", "count": 5, "percent": 21.7, "addressed_count": 5, "addressed_percent": 100.0 }
+      { "value": "tests-quality", "count": 3, "percent": 100, "addressed_count": 3, "addressed_percent": 100 }
     ],
     "by_subcategory": [
-      { "value": "security:secret-pii-exposure", "count": 3, "percent": 13.0, "addressed_count": 3, "addressed_percent": 100.0 }
+      { "value": "tests-quality:coverage-gaps", "count": 3, "percent": 100, "addressed_count": 3, "addressed_percent": 100 }
     ],
     "by_emoji": [
-      { "value": "👍", "count": 10, "percent": 43.5, "addressed_count": 10, "addressed_percent": 100.0 }
+      { "value": "none", "count": 3, "percent": 100, "addressed_count": 3, "addressed_percent": 100 }
     ]
   },
-  "evaluated_mrs": [ ]
+  "evaluated_mrs": [
+    {
+      "repo": "augmentcode-sa/ecomm-stack",
+      "mr_number": 173,
+      "total_comments": 1,
+      "augment_total_comments": 1,
+      "augment_addressed_count": 1,
+      "augment_addressed_percent": 100.0,
+      "automated_eval_comments": [
+        {
+          "addressed": true,
+          "actionable": true,
+          "comment_id": "3307085652",
+          "primary_category": "tests-quality",
+          "subcategory": "tests-quality:coverage-gaps",
+          "resolved": null,
+          "is_outdated": null,
+          "emoji": null,
+          "severity": null,
+          "author_type": "Augment",
+          "reply_count": 0
+        }
+      ]
+    }
+  ]
 }
 ```
 
