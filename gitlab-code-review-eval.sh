@@ -31,6 +31,7 @@ GITLAB_URL=""
 PROJECT_ID=""
 REPO=""
 GITLAB_SERVICE_ACCOUNT=""
+INCLUDE_OPEN=false
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -39,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --gitlab-url)       GITLAB_URL="$2";        shift 2 ;;
     --project-id)       PROJECT_ID="$2";        shift 2 ;;
     --gitlab-service-account-name) GITLAB_SERVICE_ACCOUNT="$2";  shift 2 ;;
+    --include-open)     INCLUDE_OPEN=true;      shift ;;
     --days)             DAYS="$2";              shift 2 ;;
     --output)           OUTPUT_FILE="$2";       shift 2 ;;
     -h|--help)
@@ -131,11 +133,18 @@ gitlab_get_all() {
   echo "$results"
 }
 
-# ── 1. Fetch merged MRs in the time window ───────────────────────────────────
-echo "Fetching merged MRs since $AFTER_DATE …"
-ALL_MRS=$(gitlab_get_all "projects/${PROJECT_ID}/merge_requests?state=merged&updated_after=${AFTER_DATE}&order_by=updated_at&sort=desc")
+# ── 1. Fetch MRs in the time window ───────────────────────────────────────────
+if [[ "$INCLUDE_OPEN" == true ]]; then
+  echo "Fetching all MRs (merged + open) since $AFTER_DATE …"
+  MERGED_MRS=$(gitlab_get_all "projects/${PROJECT_ID}/merge_requests?state=merged&updated_after=${AFTER_DATE}&order_by=updated_at&sort=desc")
+  OPEN_MRS=$(gitlab_get_all "projects/${PROJECT_ID}/merge_requests?state=opened&updated_after=${AFTER_DATE}&order_by=updated_at&sort=desc")
+  ALL_MRS=$(echo "$MERGED_MRS $OPEN_MRS" | jq -s '.[0] + .[1]')
+else
+  echo "Fetching merged MRs since $AFTER_DATE …"
+  ALL_MRS=$(gitlab_get_all "projects/${PROJECT_ID}/merge_requests?state=merged&updated_after=${AFTER_DATE}&order_by=updated_at&sort=desc")
+fi
 TOTAL_MR_COUNT=$(echo "$ALL_MRS" | jq 'length')
-echo "  Found $TOTAL_MR_COUNT merged MR(s) in window."
+echo "  Found $TOTAL_MR_COUNT MR(s) in window."
 
 # ── 2. Filter to MRs that Augment commented on ───────────────────────────────
 echo "Filtering to MRs reviewed by '$GITLAB_SERVICE_ACCOUNT' …"

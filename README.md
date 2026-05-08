@@ -31,7 +31,8 @@ GITLAB_TOKEN="glpat-xxxxxxxxxxxx" bash <(curl -sL https://raw.githubusercontent.
 | `--gitlab-service-account-name` | ✅ | — | The `@username` (without the `@`) of the GitLab service account used by Augment, e.g. `service_account_project_80395882_4cec11437b042730ca8ca95a0fb39a3c` |
 | `--gitlab-url` | | `https://gitlab.com` | Base URL of your GitLab instance (auto-detected from `--repo` URL) |
 | `--project-id` | | *(auto-resolved)* | Numeric project ID (auto-resolved from `--repo` if not provided) |
-| `--days` | | `7` | Number of days to look back for merged MRs |
+| `--include-open` | | *(off)* | Also include open (not yet merged) MRs in the evaluation |
+| `--days` | | `7` | Number of days to look back for MRs |
 | `--output` | | `augment-code-review-eval-report.json` | Output file path |
 
 ## How It Works
