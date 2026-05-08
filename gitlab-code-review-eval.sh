@@ -178,10 +178,8 @@ if [[ "$AUGMENT_MR_COUNT" -eq 0 ]]; then
   exit 0
 fi
 
-# ── 3. Run eval persona against each MR (parallel) ──────────────────────────
-MAX_PARALLEL=3
+# ── 3. Run eval persona against each MR ──────────────────────────────────────
 MR_TIMEOUT=300  # 5 minutes per MR
-RESULTS_DIR=$(mktemp -d)
 PROJECT_PATH_CACHED=$(curl -sf --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
   "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}" | jq -r '.path_with_namespace')
 
@@ -215,17 +213,19 @@ extract_json() {
   return 1
 }
 
-eval_mr() {
-  local iid="$1"
-  local index="$2"
-  local mr_url="${GITLAB_URL}/${PROJECT_PATH_CACHED}/-/merge_requests/${iid}"
-  local outfile="${RESULTS_DIR}/${iid}.json"
+echo "Running evaluations (${MR_TIMEOUT}s timeout each) …"
+echo ""
 
-  echo "[$index/$AUGMENT_MR_COUNT] Evaluating MR !${iid}  ${mr_url} …"
-  local start_time
-  start_time=$(date +%s)
+EVAL_RESULTS="[]"
+INDEX=0
+for iid in $(echo "$AUGMENT_MR_IIDS" | jq -r '.[]'); do
+  INDEX=$((INDEX + 1))
+  MR_URL="${GITLAB_URL}/${PROJECT_PATH_CACHED}/-/merge_requests/${iid}"
 
-  local prompt="Evaluate this merge request ${mr_url} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${GITLAB_SERVICE_ACCOUNT}'.
+  echo "[$INDEX/$AUGMENT_MR_COUNT] Evaluating MR !${iid}  ${MR_URL} …"
+  START_TIME=$(date +%s)
+
+  PROMPT="Evaluate this merge request ${MR_URL} and give me the % of comments from augment that were addressed. The Augment service account username on GitLab is '${GITLAB_SERVICE_ACCOUNT}'.
 
 IMPORTANT: To fetch MR data, use ONLY the glab CLI (GitLab CLI) via the terminal (launch-process tool). The GITLAB_TOKEN environment variable is already set and glab will authenticate automatically. Do NOT use any MCP server or other tool to access GitLab.
 
@@ -237,48 +237,22 @@ Use these glab commands:
 
 Return the result as a JSON object with the structure: {repo, mr_number, total_comments, augment_total_comments, augment_addressed_count, augment_addressed_percent, automated_eval_comments:[...]}. Output ONLY the JSON, no markdown fences."
 
-  local eval_output
-  eval_output=$(timeout "${MR_TIMEOUT}" env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$prompt" 2>/dev/null || true)
+  EVAL_OUTPUT=$(timeout "${MR_TIMEOUT}" env GITLAB_TOKEN="$GITLAB_TOKEN" auggie --persona augment-code-review-eval --print "$PROMPT" 2>/dev/null || true)
 
-  local elapsed=$(( $(date +%s) - start_time ))
+  ELAPSED=$(( $(date +%s) - START_TIME ))
 
-  local mr_json
-  if mr_json=$(extract_json "$eval_output"); then
-    echo "$mr_json" > "$outfile"
-    local addr
-    addr=$(echo "$mr_json" | jq '.augment_addressed_percent // 0')
-    echo "  ✓ MR !${iid} — Addressed: ${addr}% (${elapsed}s)"
+  MR_JSON=""
+  if MR_JSON=$(extract_json "$EVAL_OUTPUT"); then
+    EVAL_RESULTS=$(echo "$EVAL_RESULTS" | jq --argjson mr "$MR_JSON" '. + [$mr]')
+    ADDR=$(echo "$MR_JSON" | jq '.augment_addressed_percent // 0')
+    echo "  ✓ MR !${iid} — Addressed: ${ADDR}% (${ELAPSED}s)"
   else
-    jq -n --arg iid "$iid" --arg url "$mr_url" \
-      '{mr_number:($iid|tonumber), url:$url, error:"failed to parse eval output"}' > "$outfile"
-    echo "  ⚠ MR !${iid} — Could not parse eval output (${elapsed}s)"
+    SKIPPED=$(jq -n --arg iid "$iid" --arg url "$MR_URL" '{mr_number:($iid|tonumber), url:$url, error:"failed to parse eval output"}')
+    EVAL_RESULTS=$(echo "$EVAL_RESULTS" | jq --argjson s "$SKIPPED" '. + [$s]')
+    echo "  ⚠ MR !${iid} — Could not parse eval output (${ELAPSED}s)"
   fi
-}
-
-echo "Running evaluations (up to $MAX_PARALLEL in parallel, ${MR_TIMEOUT}s timeout each) …"
-echo ""
-
-INDEX=0
-RUNNING=0
-for iid in $(echo "$AUGMENT_MR_IIDS" | jq -r '.[]'); do
-  INDEX=$((INDEX + 1))
-  eval_mr "$iid" "$INDEX" &
-  RUNNING=$((RUNNING + 1))
-  if [[ "$RUNNING" -ge "$MAX_PARALLEL" ]]; then
-    wait -n 2>/dev/null || wait
-    RUNNING=$((RUNNING - 1))
-  fi
+  echo ""
 done
-wait
-
-# Collect results
-EVAL_RESULTS="[]"
-for f in "${RESULTS_DIR}"/*.json; do
-  [[ -f "$f" ]] || continue
-  EVAL_RESULTS=$(echo "$EVAL_RESULTS" | jq --slurpfile mr "$f" '. + $mr')
-done
-rm -rf "$RESULTS_DIR"
-echo ""
 
 # ── 4. Build consolidated report ─────────────────────────────────────────────
 echo "Building consolidated report …"
